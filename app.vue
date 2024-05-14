@@ -10,7 +10,13 @@ const openTab:any = ref('object');
 const stockObjects:any = ref([]);
 const stockObjectInput:any = ref({
     supplier_name: '',
-    unit_name: ''
+    unit_name: '',
+    unit_stock: 0,
+    last_stock_updated: '',
+    unit_out: 0,
+    last_unit_out_in_period: '',
+    unit_in: 0,
+    last_unit_in_in_period: ''
 });
 
 const stockObjectsFuse:any = ref();
@@ -68,7 +74,13 @@ const createStockObject: any = () => {
     stockObjectTableRequest.onsuccess = () => {
         stockObjectInput.value = {
             supplier_name: '',
-            unit_name: ''
+            unit_name: '',
+            unit_stock: 0,
+            last_stok_updated: '',
+            unit_out: 0,
+            last_unit_out_in_period: '',
+            unit_in: 0,
+            last_unit_in_in_period: ''
         };
     };
     stockObjectTableRequest.onerror = () => {
@@ -105,6 +117,7 @@ const stockMovementInput:any = ref({
     movement_volume: '',
     movement_date:  '',
 });
+const stockMovementUnitIndex:any = ref();
 
 const stockMovementsFuse:any = ref();
 const stockMovementsQuickSearchQuery: any = ref('');
@@ -186,6 +199,55 @@ const deleteStockMovement: any = (id: string) => {
     getAllStockMovements();
 }
 
+/*
+    Stock Count Constants
+*/
+
+const updateStockCount:any = (
+    stockObject: any,
+) => {
+    let stockMovementTable = db.value.transaction("stockMovement").objectStore("stockMovement");
+    let stockMovementUnitIndex = stockMovementTable.index('movementUnitIndex');
+
+    let stockMovementUnitIndexRequest = stockMovementUnitIndex.getAll(stockObject.id);
+
+    stockMovementUnitIndexRequest.onsuccess = () => {
+        if (stockMovementUnitIndexRequest.result !== undefined) {
+            let targetStockMovementUnits: any = stockMovementUnitIndexRequest.result;
+
+            let stockMovementIns: any = targetStockMovementUnits.filter((targetStockMovementUnit:any) => targetStockMovementUnit.movement_type == 'in');
+            let stockMovementInQuantity = stockMovementIns.map((stockMovementIn:any) => stockMovementIn.movement_volume);
+
+            let stockMovementOuts: any = targetStockMovementUnits.filter((targetStockMovementUnit:any) => targetStockMovementUnit.movement_type == 'out');
+            let stockMovementOutQuantity = stockMovementOuts.map((stockMovementOut:any) => stockMovementOut.movement_volume);
+            
+            
+            stockObject.unit_in = stockMovementInQuantity.reduce((partialSum:number, a:number) => partialSum + a, 0);
+            stockObject.unit_out = stockMovementOutQuantity.reduce((partialSum:number, a:number) => partialSum + a, 0);
+            stockObject.unit_stock = stockObject.unit_in - stockObject.unit_out;
+            stockObject.last_stock_updated = new Date().toISOString().slice(0,10);
+
+            let {stockObjectId, ...stockObjectFields} = stockObject
+            let stockObjectTable = db.value.transaction("stockObject", "readwrite").objectStore("stockObject");
+            let stockObjectTableRequest = stockObjectTable.put(stockObjectFields, stockObjectId);
+
+            stockObjectTableRequest.onsuccess = () => {
+                console.log("Updated stock object");
+            };
+        } else {
+            console.log("No such books");
+        }
+    };
+}
+
+const updateStockCounts: any = () => {
+    getAllStockObjects();
+
+    for (let i=0; i < stockObjects.value.length; i++) {
+        updateStockCount(stockObjects.value[i]);
+    }; 
+}
+
 
 /*
     Application Start
@@ -222,13 +284,15 @@ onMounted(() => {
             5. movementDate (in Date object)
         */
         if (!db.value.objectStoreNames.contains('stockMovement')) {
-            db.value.createObjectStore(
+            let stockMovementTable:any = db.value.createObjectStore(
                 'stockMovement', 
                 {
                     keyPath: 'id',
                     autoIncrement: true
                 }
-            );
+            )
+            stockMovementTable.createIndex('movementUnitIndex', 'movement_unit');
+            stockMovementTable.createIndex('movementTableIndex', 'movement_date');
         }
     };
 
@@ -275,7 +339,7 @@ onMounted(() => {
                         @click="openTab = 'object'"
                         class="border-b text-left py-1"
                     >
-                        Supplier Stok
+                        Stok
                     </button>
                     <button 
                         @click="openTab = 'movement'"
@@ -310,6 +374,7 @@ onMounted(() => {
                 >
                     Tambah Sebagai Stok
                 </button>
+                <button @click="updateStockCounts()">Update Stock</button>
             </div>
             <div class="flex flex-col">
                 <div 
@@ -370,15 +435,15 @@ onMounted(() => {
                     <option value="out" class="text-black">Barang Keluar</option>
                 </select>
                 <input 
-                    v-model="stockMovementInput.movement_value"
-                    type="number" 
-                    placeholder="Nilai pergerakan stok" 
-                    class="border-b-2 px-2 py-1"
-                />
-                <input 
                     v-model="stockMovementInput.movement_volume"
                     type="number" 
                     placeholder="Besar pergerakan stok" 
+                    class="border-b-2 px-2 py-1"
+                />
+                <input 
+                    v-model="stockMovementInput.movement_value"
+                    type="number" 
+                    placeholder="Nilai pergerakan stok" 
                     class="border-b-2 px-2 py-1"
                 />
                 <input 
