@@ -241,11 +241,12 @@ const updateStockCount:any = (
 }
 
 const updateStockCounts: any = () => {
-    getAllStockObjects();
-
     for (let i=0; i < stockObjects.value.length; i++) {
         updateStockCount(stockObjects.value[i]);
-    }; 
+    };
+    console.log('hello world')
+
+    getAllStockObjects(); 
 }
 
 
@@ -324,8 +325,8 @@ onMounted(() => {
             content="Build your next Vue.js application with confidence using Nuxt...."
         />
     </Head>
-    <main class="p-16 grid grid-cols-5 gap-8">
-        <aside class="col-span-1 row-span-2">
+    <main class="p-4 md:p-16 grid grid-cols-5 gap-8">
+        <aside class="col-span-5 md:col-span-1 md:row-span-2">
             <div>
                 <h1 class="text-2xl font-bold">TemanMikro</h1>
                 <div class="flex flex-col">
@@ -352,65 +353,83 @@ onMounted(() => {
         </aside>
         <section
             v-if="openTab == 'object'"
-            class="col-span-4 flex flex-col space-y-4 border-l p-4 bg-gray-50 rounded-md"
+            class="col-span-5 md:col-span-4 flex flex-col space-y-4 border-l p-4 bg-gray-50 rounded-md shadow-md"
         >
-            <h2 class="text-xl">Tambah Stok</h2>
+            <h2 class="text-xl font-bold">Tambah Stok</h2>
             <div class="shadow-sm flex flex-col">
+                <span class="text-md">Nama Supplier:</span>
                 <input 
                     v-model="stockObjectInput.supplier_name"
                     type="text" 
                     placeholder="Nama supplier"
-                    class="border-b-2 px-2 py-1"
+                    class="border-b-2 bg-gray-100 mb-3 px-2 py-1 rounded-md"
                 />
+                <span class="text-md">Nama Unit:</span>
                 <input 
                     v-model="stockObjectInput.unit_name"
                     type="text" 
                     placeholder="Nama unit" 
-                    class="border-b-2 px-2 py-1"
+                    class="border-b-2 bg-gray-100 mb-3 px-2 py-1 rounded-md"
                 />
-                <button 
-                    @click="createStockObject()"
-                    class="px-2 py-1 bg-green-700 text-white"
-                >
-                    Tambah Sebagai Stok
-                </button>
-                <button @click="updateStockCounts()">Update Stock</button>
-            </div>
-            <div class="flex flex-col">
-                <div 
-                    v-for="stockObject, idx in stockObjects" 
-                    :key="`${stockObject.id}_${idx}`" 
-                    class="w-full flex flex-row text-sm p-2 border-b"
-                >
-                    <p class="w-4/5"><span class="font-medium">{{ stockObject.supplier_name }}</span> <span>{{ stockObject.unit_name }}</span></p>
+                <div class="flex flex-row">
                     <button 
-                        class="w-1/5 text-xs text-red-600"
-                        @click="deleteStockObject(stockObject.id)"
+                        @click="createStockObject()"
+                        class="px-2 py-1 bg-green-700 text-sm text-white rounded-l-lg w-3/4 font-semibold"
                     >
-                        Hapus
+                        Tambah Sebagai Stok
+                    </button>
+                    <button 
+                        @click="updateStockCounts()"
+                        class="px-2 py-1 bg-gray-700 text-sm text-white rounded-r-lg w-1/4 font-semibold"
+                    >
+                        Update Stock
                     </button>
                 </div>
+                
+            </div>
+        </section>
+        <section
+            v-if="openTab == 'object' && stockObjects.length > 0"
+            class="col-span-5 md:col-span-4 flex flex-col space-y-4 rounded-md"
+        >
+            <div 
+                v-for="stockObject, idx in stockObjects" 
+                :key="`${stockObject.id}_${idx}`" 
+                class="w-full flex flex-row text-sm p-2 border-b"
+            >
+                <p class="w-4/5">
+                    <span class="font-medium">{{ stockObject.supplier_name }}</span> <span>{{ stockObject.unit_name }}</span>
+                </p>
+                <p class="font-bold">
+                    {{ stockObject.unit_stock }}
+                </p>
+                <button 
+                    class="w-1/5 text-xs text-red-600"
+                    @click="deleteStockObject(stockObject.id)"
+                >
+                    Hapus
+                </button>
             </div>
         </section>
         <section 
             v-if="openTab == 'movement'"
-            class="col-span-4 flex flex-col space-y-4 border-l p-4 bg-gray-50 rounded-md"
+            class="col-span-5 md:col-span-4 flex flex-col space-y-4 border-l p-4 bg-gray-50 rounded-md shadow-md"
         >
-            <h2 class="text-xl">Tambah Pergerakan Stok</h2>
-            <div class="shadow-sm flex flex-col">
-                
-                <div class="border-b-2 py-4">
+            <h2 class="text-xl font-bold">Tambah Pergerakan Stok</h2>
+            <div class="flex flex-col">
+                <span class="text-md">Pilih Unit yang Bergerak:</span>
+                <div class="border-b-2 bg-gray-100 mb-3 px-2 py-1 rounded-md">
                     <p 
                         class="w-full py-1"
                         :class="stockMovementInput.movement_unit ? 'text-black' : 'text-gray-400'"
                     >
-                        {{ stockMovementInput.movement_unit ? stockMovementInput.movement_unit : 'Cari Unit yang Bergerak' }}
+                        {{ stockMovementInput.movement_unit ? `terpilih: ${stockMovementInput.movement_unit}` : 'Unit yang dipilih:' }}
                     </p>
                     <input 
                         v-model="stockObjectsQuickSearchQuery"
                         type="text" 
                         placeholder="..."
-                        class="w-full border ml-4 pl-4 py-1"
+                        class="w-full px-4 py-1 bg-gray-100 border-2 rounded-lg"
                     />
                     <button
                         v-for="searchResult, idx in stockObjectsQuickSearchResult"
@@ -419,73 +438,83 @@ onMounted(() => {
                             stockMovementInput.movement_unit = searchResult.item.id;
                             stockObjectsQuickSearchQuery = '';
                         "
-                        class="ml-4 pl-4 w-full text-left border-b-2 border-blue-100 py-2"
+                        class="w-full text-left border-b-2 border-gray-400 py-1 px-4"
                     >
                         {{  searchResult.item.id }}
                     </button>
                 </div>
+                <span class="text-md">Pilih Tipe Pergerakan Stok:</span>
                 <select 
                     v-model="stockMovementInput.movement_type" 
                     placeholder="Tipe pergerakan stok" 
-                    class="border-b-2 px-1 py-1"
+                    class="border-b-2 bg-gray-100 mb-3 px-2 py-1 rounded-md"
                     :class="stockMovementInput.movement_type ? 'text-black' : 'text-gray-400'"
                 >
                     <option value="''" class="text-gray-400" disabled selected>Pilih Tipe Pergerakan</option>
                     <option value="in" class="text-black">Barang Masuk</option>
                     <option value="out" class="text-black">Barang Keluar</option>
                 </select>
+                <span class="text-md">Besar (Kuantitas) Pergerakan Stok:</span>
                 <input 
                     v-model="stockMovementInput.movement_volume"
                     type="number" 
                     placeholder="Besar pergerakan stok" 
-                    class="border-b-2 px-2 py-1"
+                    class="border-b-2 bg-gray-100 mb-3 px-2 py-1 rounded-md"
                 />
+                <span class="text-md">Nlai (Rupiah) Pergerakan Stok:</span>
                 <input 
                     v-model="stockMovementInput.movement_value"
                     type="number" 
                     placeholder="Nilai pergerakan stok" 
-                    class="border-b-2 px-2 py-1"
+                    class="border-b-2 bg-gray-100 mb-3 px-2 py-1 rounded-md"
                 />
+                <span class="text-md">Nilai (Rupiah) Pergerakan Stok:</span>
                 <input 
                     v-model="stockMovementInput.movement_date"
                     type="date" 
                     placeholder="Tanggal pergerakan stok" 
-                    class="border-b-2 px-2 py-1"
+                    class="border-b-2 bg-gray-100 mb-3 px-2 py-1 rounded-md"
                 />
-                <button 
-                    @click="createStockMovement()"
-                    class="px-2 py-1 bg-green-700 text-white"
-                >
-                    Tambah Pergerakan Stok
-                </button>
-            </div>
-            <div class="flex flex-col">
-                <div 
-                    v-for="stockMovement, idx in stockMovements" 
-                    :key="`${stockMovement.id}_${idx}`" 
-                    class="w-full flex flex-row text-sm p-2 border-b"
-                >
-                    <div class="w-4/5">
-                        <p class="text-xs">
-                            <span 
-                                class="border pl-1 pr-2 rounded-r-lg"
-                                :class="stockMovement.movement_type == 'in' ? 'text-white bg-indigo-700 border-indigo-700' : 'text-green-900 border-green-900'"
-                            >
-                                {{ stockMovement.movement_type == 'in' ? 'Barang Masuk' : 'Barang Keluar' }}
-                            </span>
-                            {{ stockMovement.movement_date }}
-                        </p>
-                        <p class="py-1 text-lg">{{ stockMovement.movement_unit }}</p>
-                        <p class="text-md">Rp. {{ String(stockMovement.movement_value).replace(/(.)(?=(\d{3})+$)/g,'$1,') }} | {{ stockMovement.movement_volume }} pcs</p>
-                    </div>
+                <div class="flex flex-row">
                     <button 
-                        class="w-1/5 text-xs text-red-600"
-                        @click="deleteStockMovement(stockMovement.id)"
+                        @click="createStockMovement()"
+                        class="px-2 py-1 bg-green-700 text-sm text-white rounded-lg w-full font-semibold"
                     >
-                        Hapus
+                        Tambah Pergerakan Stok
                     </button>
                 </div>
             </div>
+        </section>
+        <section
+            v-if="openTab == 'movement' && stockMovements.length > 0"
+            class="col-span-5 md:col-span-4 flex flex-col space-y-4 rounded-md"
+        >
+            <div 
+                v-for="stockMovement, idx in stockMovements" 
+                :key="`${stockMovement.id}_${idx}`" 
+                class="w-full flex flex-row text-sm border-b py-1"
+            >
+                <div class="w-4/5">
+                    <p class="text-xs">
+                        <span 
+                            class="border pl-1 pr-2 rounded-r-lg"
+                            :class="stockMovement.movement_type == 'in' ? 'text-white bg-indigo-700 border-indigo-700' : 'text-green-900 border-green-900'"
+                        >
+                            {{ stockMovement.movement_type == 'in' ? 'Barang Masuk' : 'Barang Keluar' }}
+                        </span>
+                        {{ stockMovement.movement_date }}
+                    </p>
+                    <p class="text-lg">{{ stockMovement.movement_unit }}</p>
+                    <p class="text-md">Rp. {{ String(stockMovement.movement_value).replace(/(.)(?=(\d{3})+$)/g,'$1,') }} | {{ stockMovement.movement_volume }} pcs</p>
+                </div>
+                <button 
+                    class="w-1/5 text-xs text-red-600"
+                    @click="deleteStockMovement(stockMovement.id)"
+                >
+                    Hapus
+                </button>
+            </div>
+
         </section>
     </main>
     
