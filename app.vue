@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import Fuse from 'fuse.js'
+
 const db:any = ref();
 const openTab:any = ref('object');
 
@@ -12,7 +13,8 @@ const stockObjectInput:any = ref({
     supplier_name: '',
     unit_name: '',
     unit_stock: 0,
-    last_stock_updated: '',
+    unit_average_in_value: 0,
+    unit_average_out_value: 0,
     unit_out: 0,
     last_unit_out_in_period: '',
     unit_in: 0,
@@ -76,7 +78,8 @@ const createStockObject: any = () => {
             supplier_name: '',
             unit_name: '',
             unit_stock: 0,
-            last_stok_updated: '',
+            unit_average_in_value: 0,
+            unit_average_out_value: 0,
             unit_out: 0,
             last_unit_out_in_period: '',
             unit_in: 0,
@@ -145,6 +148,7 @@ watch(stockMovementsQuickSearchQuery, (newValue, oldValue) => {
     getQuickSearchStockMovementsResults();
 });
 
+
 const getAllStockMovements: any = () => {
     let stockMovementTable = db.value.transaction("stockMovement", "readwrite").objectStore("stockMovement");
     let stockMovementTableRequest = stockMovementTable.getAll();
@@ -199,6 +203,7 @@ const deleteStockMovement: any = (id: string) => {
     getAllStockMovements();
 }
 
+
 /*
     Stock Count Constants
 */
@@ -217,15 +222,18 @@ const updateStockCount:any = (
 
             let stockMovementIns: any = targetStockMovementUnits.filter((targetStockMovementUnit:any) => targetStockMovementUnit.movement_type == 'in');
             let stockMovementInQuantity = stockMovementIns.map((stockMovementIn:any) => stockMovementIn.movement_volume);
+            let stockMovementInValue = stockMovementIns.map((stockMovementIn:any) => stockMovementIn.movement_value);
 
             let stockMovementOuts: any = targetStockMovementUnits.filter((targetStockMovementUnit:any) => targetStockMovementUnit.movement_type == 'out');
             let stockMovementOutQuantity = stockMovementOuts.map((stockMovementOut:any) => stockMovementOut.movement_volume);
+            let stockMovementOutValue = stockMovementIns.map((stockMovementIn:any) => stockMovementIn.movement_value);
             
             
             stockObject.unit_in = stockMovementInQuantity.reduce((partialSum:number, a:number) => partialSum + a, 0);
             stockObject.unit_out = stockMovementOutQuantity.reduce((partialSum:number, a:number) => partialSum + a, 0);
             stockObject.unit_stock = stockObject.unit_in - stockObject.unit_out;
-            stockObject.last_stock_updated = new Date().toISOString().slice(0,10);
+            stockObject.unit_average_in_value = stockMovementInValue.reduce((partialSum:number, a:number) => partialSum + a, 0) / stockObject.unit_in;
+            stockObject.unit_average_out_value = stockMovementOutValue.reduce((partialSum:number, a:number) => partialSum + a, 0) / stockObject.unit_in;
 
             let {stockObjectId, ...stockObjectFields} = stockObject
             let stockObjectTable = db.value.transaction("stockObject", "readwrite").objectStore("stockObject");
@@ -249,12 +257,63 @@ const updateStockCounts: any = () => {
     getAllStockObjects(); 
 }
 
+/*
+    Charts
+*/
+// const getDaysInMonth = (month:number, year:number) => {
+//     const date = new Date(year, month, 1);
+//     const days = [];
+//     while (date.getMonth() === month) {
+//         days.push(new Date(date));
+//         date.setDate(date.getDate() + 1);
+//     }
+//     return days;
+// }
+// const currentMonth = new Date().getMonth();
+// const currentYear = new Date().getFullYear();
+// const allDatesInCurrentMonth = getDaysInMonth(currentMonth, currentYear).map(date => date.toISOString().split('T')[0]);
+
+const currentLabels: any = ref([])
+const currentDataset: any = ref([])
+
+const getAggregateDataOnDate = (from:string, to:string) => {
+    let stockMovementTable = db.value.transaction("stockMovement").objectStore("stockMovement");
+    let stockMovementDateIndex = stockMovementTable.index('movementDateIndex');
+    let stockMovementDateIndexRequest = stockMovementDateIndex.getAll(IDBKeyRange.bound(from, to));
+
+
+    let currentDate = from;
+    let stockMovementDateTransactions:any = [];
+    let stockMovementDates:any = [];
+
+    stockMovementDateIndexRequest.onsuccess = () => {
+        let targetStockMovementUnits: any = stockMovementDateIndexRequest.result;
+        let stockMovementOuts: any = targetStockMovementUnits.filter((targetStockMovementUnit:any) => targetStockMovementUnit.movement_type == 'out');
+        
+        stockMovementDateTransactions.push(stockMovementOuts[0].movement_value);
+        stockMovementDates.push(stockMovementOuts[0].movement_date);
+        for (let i=1; i < stockMovementOuts.length; i++){
+            if (stockMovementOuts[i].movement_date == currentDate) {
+                stockMovementDateTransactions[stockMovementDateTransactions.length-1] += stockMovementOuts[i].movement_value
+            } else {
+                stockMovementDateTransactions.push(stockMovementOuts[i].movement_value);
+                currentDate = stockMovementOuts[i].movement_date;
+                stockMovementDates.push(stockMovementOuts[i].movement_date);
+            }
+        }
+    }
+
+    currentLabels.value = stockMovementDates;
+    currentDataset.value = stockMovementDateTransactions;
+}
+
+
 
 /*
     Application Start
 */
 onMounted(() => {
-    let openRequest = window.indexedDB.open("TemanMikro", 1);
+    let openRequest = window.indexedDB.open("MikroStok", 1);
 
     /*
         Initialize database
@@ -293,7 +352,7 @@ onMounted(() => {
                 }
             )
             stockMovementTable.createIndex('movementUnitIndex', 'movement_unit');
-            stockMovementTable.createIndex('movementTableIndex', 'movement_date');
+            stockMovementTable.createIndex('movementDateIndex', 'movement_date');
         }
     };
 
@@ -328,8 +387,9 @@ onMounted(() => {
     <main class="p-4 md:p-16 grid grid-cols-5 gap-8">
         <aside class="col-span-5 md:col-span-1 md:row-span-2">
             <div>
-                <h1 class="text-2xl font-bold">TemanMikro</h1>
-                <div class="flex flex-col">
+                <h1 class="text-2xl font-bold">MikroStok</h1>
+                <p class="text-md">Solusi manajemen stok sederhana untuk bisnis mikro dan kecil</p>
+                <div class="flex flex-col my-2">
                     <button 
                         @click="openTab = 'dashboard'"
                         class="border-b text-left py-1"
@@ -351,6 +411,29 @@ onMounted(() => {
                 </div>
             </div>
         </aside>
+        <section
+            v-if="openTab == 'dashboard'"
+            class="col-span-5 md:col-span-4 flex flex-col space-y-4 border-l p-4 bg-gray-50 rounded-md shadow-md"
+        >
+            <h2 class="text-xl font-bold">Penjualan Harian</h2>
+            <div class="flex flex-row">
+                <button 
+                    @click="getAggregateDataOnDate('2024-05-12', '2024-05-21')"
+                    class="px-2 py-1 bg-gray-700 text-sm text-white w-1/4 font-semibold"
+                >
+                    Update Grafik
+                </button>
+            </div>
+            <div  class="h-[40vh]">
+                <TimeSeriesChart  :labels="currentLabels" :dataset="currentDataset" />
+            </div>
+        </section>
+        <section
+            v-if="openTab == 'dashboard'"
+            class="col-span-5 md:col-span-4 flex flex-col space-y-4 border-l p-4 bg-gray-50 rounded-md shadow-md"
+        >
+            <h2 class="text-xl font-bold">Nilai Stok</h2>
+        </section>
         <section
             v-if="openTab == 'object'"
             class="col-span-5 md:col-span-4 flex flex-col space-y-4 border-l p-4 bg-gray-50 rounded-md shadow-md"
@@ -382,7 +465,7 @@ onMounted(() => {
                         @click="updateStockCounts()"
                         class="px-2 py-1 bg-gray-700 text-sm text-white rounded-r-lg w-1/4 font-semibold"
                     >
-                        Update Stock
+                        Update Stok
                     </button>
                 </div>
                 
@@ -392,19 +475,42 @@ onMounted(() => {
             v-if="openTab == 'object' && stockObjects.length > 0"
             class="col-span-5 md:col-span-4 flex flex-col space-y-4 rounded-md"
         >
+            <div class="w-full flex flex-row text-sm p-2 border-b">
+                <p class="w-5/12 text-xs">
+                    Nama Barang
+                </p>
+                <p class="w-2/12 text-xs">
+                    Harga Jual
+                </p>
+                <p class="w-2/12 text-xs">
+                    Harga Beli
+                </p>
+                <p class="w-3/12 text-xs">
+                    Jumlah Stok
+                </p>
+                <p class="w-1/12 text-xs">
+                    Aksi
+                </p>
+            </div>
             <div 
                 v-for="stockObject, idx in stockObjects" 
                 :key="`${stockObject.id}_${idx}`" 
                 class="w-full flex flex-row text-sm p-2 border-b"
             >
-                <p class="w-4/5">
+                <p class="w-5/12">
                     <span class="font-medium">{{ stockObject.supplier_name }}</span> <span>{{ stockObject.unit_name }}</span>
                 </p>
-                <p class="font-bold">
+                <p class="w-2/12">
+                    Rp. {{ String(stockObject.unit_average_out_value).replace(/(.)(?=(\d{3})+$)/g,'$1,') }}
+                </p>
+                <p class="w-2/12">
+                    Rp. {{ String(stockObject.unit_average_in_value).replace(/(.)(?=(\d{3})+$)/g,'$1,') }}
+                </p>
+                <p class="w-3/12 font-bold">
                     {{ stockObject.unit_stock }}
                 </p>
                 <button 
-                    class="w-1/5 text-xs text-red-600"
+                    class="w-1/12 text-xs text-red-600"
                     @click="deleteStockObject(stockObject.id)"
                 >
                     Hapus
@@ -504,8 +610,9 @@ onMounted(() => {
                         </span>
                         {{ stockMovement.movement_date }}
                     </p>
-                    <p class="text-lg">{{ stockMovement.movement_unit }}</p>
-                    <p class="text-md">Rp. {{ String(stockMovement.movement_value).replace(/(.)(?=(\d{3})+$)/g,'$1,') }} | {{ stockMovement.movement_volume }} pcs</p>
+                    <p class="text-lg">{{ stockMovement.movement_volume }}x {{ stockMovement.movement_unit }}</p>
+                    <p class="text-md">Rp. {{ String(stockMovement.movement_value).replace(/(.)(?=(\d{3})+$)/g,'$1,') }} (Rp. {{ String(stockMovement.movement_value / stockMovement.movement_volume).replace(/(.)(?=(\d{3})+$)/g,'$1,') }}/pcs)</p>
+                    <p class="font-thin"></p>
                 </div>
                 <button 
                     class="w-1/5 text-xs text-red-600"
@@ -514,9 +621,6 @@ onMounted(() => {
                     Hapus
                 </button>
             </div>
-
         </section>
     </main>
-    
-    
 </template>
